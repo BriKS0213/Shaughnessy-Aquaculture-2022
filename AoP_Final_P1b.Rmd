@@ -35,15 +35,11 @@ library(cowplot)
 
 ```
 
-##NOTE: for the purposes of this code, "Survey 2" = marine aquaculture survey (MA survey) and "Survey 3" = seaweed farming survey (SW survey). The code is annotated throughout to explain transformations and groupings. Overall, in the chunk of code that follows, initial transformations resulted the following important groupings that are then used throughout the analysis:
-
-Opinion: 1 = never heard of it, 2 = heard of it but know little about it, 3 = somewhat familiar, 4 = very familiar.
-
-Familiarity: 1 = unfavorable, 2 = neutral, 3 = favorable, 4 = not sure
-
-Region: survey_2 regions (MA survey) were filtered down to only responses from the states that were also surveyed in survey_3 (SW survey).
-
-Education: Due to skewed samples, the 7-8 categories were collapsed into 1 = high school or less, 2 = undergraduate or vocational training, 3 = graduate work or degree.
+##NOTE: for the purposes of this code, "Survey 2" = marine aquaculture survey (MA survey) and "Survey 3" = seaweed farming survey (SW survey). The code is annotated throughout to explain transformations and groupings. Overall, in the chunk of code that follows, initial transformations resulted the following important groupings that are then used throughout the analysis.
+Opinion 1 = never heard of it, 2 = heard of it but know little about it, 3 = somewhat familiar, 4 = very familiar.
+Familiarity 1 = unfavorable, 2 = neutral, 3 = favorable, 4 = not sure
+Region survey_2 regions (MA survey) were filtered down to only responses from the states that were also surveyed in survey_3 (SW survey).
+Education Due to skewed samples, the 7-8 categories were collapsed into 1 = high school or less, 2 = undergraduate or vocational training, 3 = graduate work or degree.
 
 ```{r, Full datasets with initial transformations, include = FALSE}
 
@@ -226,41 +222,6 @@ survey_3$Education_collapsed <- case_when(
 table(survey_3$Education_collapsed)
 ```
 
-```{r, Initial inspections of the data, include = FALSE}
-
-table(survey_2$Opinion_aqua_post)
-s2_edu <- as.data.frame(table(survey_2$Opinion_aqua_pre, survey_2$Education_factor))
-s3_edu <- as.data.frame(table(survey_3$Opinion_seaweed, survey_3$Education_factor))
-table(survey_3$Education_factor)
-table(survey_2$Education_factor)
-
-#Tables for survey 2 opinion frequencies
-very_unfav <- survey_2 %>%
-  dplyr::filter(Opinion_aqua_pre == "1")
-table(very_unfav$Opinion_aqua_post)
-
-unfav <- survey_2 %>%
-  dplyr::filter(Opinion_aqua_pre == "2")
-table(unfav$Opinion_aqua_post)
-
-neutral <- survey_2 %>%
-  dplyr::filter(Opinion_aqua_pre == "3")
-table(neutral$Opinion_aqua_post)
-
-not_sure <- survey_2 %>%
-  dplyr::filter(Opinion_aqua_pre == "6")
-table(not_sure$Opinion_aqua_post)
-
-very_fav <- survey_2 %>%
-  dplyr::filter(Opinion_aqua_pre == "5")
-table(very_fav$Opinion_aqua_post)
-
-fav <- survey_2 %>%
-  dplyr::filter(Opinion_aqua_pre == "4")
-table(fav$Opinion_aqua_post)
-
-```
-
 ##Baseline opinions by familiarity level (SW survey only)
 ```{r, ChiSq tests on baseline opinion by familiarity, include = FALSE}
 
@@ -319,322 +280,163 @@ fam_chisq <- chisq.test(table_fam)
 expected_fam <- round(fam_chisq$expected, 1)
 ```
 
-##Pre- and Post- opinion analyses (MA and SW surveys)
-```{r, ChiSq on pre-post opinion, include = FALSE}
-#remove the 'never heard of it' grouping from these analyses -- reported separately.
-prepost_sw_chisq <- survey_3 %>%
-  dplyr::filter(Familiarity_sw_factor != 'Never heard of it')
-table(prepost_sw_chisq$Opinion_seaweed)
-prepost_sw_chisq <- prepost_sw_chisq %>%
-  dplyr::filter(Opinion_seaweed != 7)
-
-prepost_sw_table <- table(prepost_sw_chisq$Opinion_seaweed, prepost_sw_chisq$Opinion_seaweed_post)
-table(prepost_sw_chisq$Opinion_seaweed_post)
-table(prepost_sw_chisq$Opinion_seaweed)
-
-#3 responses from the pre-opinion question are removed because they did not respond with a post-opinion of seaweed farming.
-pre <- c(47, 204, 339, 54)
-post <- c(19, 58, 561, 6)
-op <- c(1, 2, 3, 4)
-pre_post_sw_data <- as.matrix(rbind(pre, post))
-pre_post_sw_chi <- chisq.test(pre_post_sw_data)
-expected_prepost_sw <- round(pre_post_sw_chi$expected, 1)
-
-#same process for aquaculture and pre- post scores
-table(survey_2$Opinion_aqua_pre)
-table(survey_2$Opinion_aqua_post)
-
-pre_aq <- c(19, 50, 69, 15)
-post_aq <- c(11, 31, 109, 2)
-op_aq <- c(1, 2, 3, 4)
-pre_post_ma_data <- as.matrix(rbind(pre_aq, post_aq))
-pre_post_ma_chi <- chisq.test(pre_post_ma_data)
-expected_prepost_ma <- round(pre_post_ma_chi$expected, 1)
-
-```
-
 ##Message Testing data and analyses (MA and SW surveys)
-```{r, ChiSq on message testing, include = FALSE}
 
-####MA survey message testing####
-s2_m3 <- survey_2 %>%
+```{r, Data for binomial logistic regression on message testing, include = FALSE}
+###note to self that what i'm doing here repeats the code in the message heat map chunk and eventually can be consolodated.
+
+#Data for coastal states only#
+s2_binom <- survey_2 %>%
   dplyr::select(c("Message_1", "Message_2", "Message_3", "Message_4", "Message_5", "Message_6", "Message_7", "Message_8", "Message_9", "Message_10", "Opinion_aqua_pre"))
 
-#Remove NAs - final n = 153
-s2_m3 <- mutate_all(s2_m3, na_if, '#NULL!') 
-s2_m3 <- s2_m3[complete.cases(s2_m3),]
-table(s2_m3$Opinion_aqua_pre)
-#group opinion into unfavorable, neutral, favorable
-s2_m3$Opinion_aqua_pre <- case_when(
-  s2_m3$Opinion_aqua_pre %% 4 == 0 ~ "Not sure",
-  s2_m3$Opinion_aqua_pre %% 3 == 0 ~ "Favorable opinion of marine aquaculture",
-  s2_m3$Opinion_aqua_pre %% 2 == 0 ~ "Neutral",
-  s2_m3$Opinion_aqua_pre %% 1 == 0 ~ "Unfavorable opinion of marine aquaculture"
+#Remove incomplete responses - final n = 153
+s2_binom <- mutate_all(s2_binom, na_if, '#NULL!') 
+s2_binom <- s2_binom[complete.cases(s2_binom),]
+
+#set up opinion to match heat map (unfavorable, neutral/not sure, favorable)
+table(s2_binom$Opinion_aqua_pre)
+s2_binom$Opinion_aqua_pre <- case_when(
+  s2_binom$Opinion_aqua_pre %% 4 == 0 ~ "Neutral/Not sure",
+  s2_binom$Opinion_aqua_pre %% 3 == 0 ~ "Favorable",
+  s2_binom$Opinion_aqua_pre %% 2 == 0 ~ "Neutral/Not sure",
+  s2_binom$Opinion_aqua_pre %% 1 == 0 ~ "Unfavorable"
 )
 
-#long-form
-s2_m3_long <- s2_m3 %>%
+#Mutate to long-form data
+s2_binom <- s2_binom %>%
+  pivot_longer(cols = Message_1:Message_10, names_to = "Message",
+               values_to = 'rank')
+table(s2_binom$Message, s2_binom$rank)
+
+#Set up rankings to be in three categories: 0 = weak, 1 = strong, 3 = neutral:
+s2_binom$rank_factor <- case_when(
+     s2_binom$rank %% 10 == 0 ~ 1,
+     s2_binom$rank %% 9 == 0 ~ 1,
+     s2_binom$rank %% 8 == 0 ~ 1,
+     s2_binom$rank %% 7 == 0 ~ 1,
+     s2_binom$rank %% 6 == 0 ~ 3,
+     s2_binom$rank %% 5 == 0 ~ 3,
+     s2_binom$rank %% 4 == 0 ~ 0,
+     s2_binom$rank %% 3 == 0 ~ 0,
+     s2_binom$rank %% 2 == 0 ~ 0,
+     s2_binom$rank %% 1 == 0 ~ 0)
+
+#Supplemental table S4 in paper
+table(s2_binom$rank_factor, s2_binom$Message)
+
+#remove the neutral reason group for the binomial
+s2_binom$rank_factor = as.numeric(s2_binom$rank_factor)
+s2_binom <- s2_binom %>%
+  dplyr::filter(rank_factor != 3)
+
+#Survey 3 data for heat map plot without resistant group
+s3_binom <- survey_3 %>%
+  dplyr::select(c("Message_1", "Message_2", "Message_3", "Message_4", "Message_5", "Message_6", "Message_7", "Message_8", "Message_9", "Message_10", "Opinion_seaweed"))
+table(s3_binom$Opinion_seaweed)
+
+#Remove NAs - final total n = 865
+s3_binom <- mutate_all(s3_binom, na_if, '#NULL!')
+s3_binom <- s3_binom[complete.cases(s3_binom),]
+
+#group opinion into unfavorable, neutral, favorable, never heard
+s3_binom$Opinion_seaweed <- case_when(
+  s3_binom$Opinion_seaweed %% 7 == 0 ~ "Never heard",
+  s3_binom$Opinion_seaweed %% 4 == 0 ~ "Not sure",
+  s3_binom$Opinion_seaweed %% 3 == 0 ~ "Favorable",
+  s3_binom$Opinion_seaweed %% 2 == 0 ~ "Neutral",
+  s3_binom$Opinion_seaweed %% 1 == 0 ~ "Unfavorable"
+)
+
+table(s3_binom$Opinion_seaweed)
+
+#Mutate to long-form data
+s3_binom <- s3_binom %>%
   pivot_longer(cols = Message_1:Message_10, names_to = "Message",
                values_to = 'rank')
 
-s2_m3_long$rank = as.numeric(s2_m3_long$rank)
+#Set up rankings to be in three categories: 0 = weak, 1 = strong, 3 = neutral:
+s3_binom$rank_factor <- case_when(
+     s3_binom$rank %% 10 == 0 ~ 1,
+     s3_binom$rank %% 9 == 0 ~ 1,
+     s3_binom$rank %% 8 == 0 ~ 1,
+     s3_binom$rank %% 7 == 0 ~ 1,
+     s3_binom$rank %% 6 == 0 ~ 3,
+     s3_binom$rank %% 5 == 0 ~ 3,
+     s3_binom$rank %% 4 == 0 ~ 0,
+     s3_binom$rank %% 3 == 0 ~ 0,
+     s3_binom$rank %% 2 == 0 ~ 0,
+     s3_binom$rank %% 1 == 0 ~ 0)
 
-#Transform message "rank" into 1 = weak, 2 = neutral, 3 = strong:
-s2_m3_long$rank <- case_when(
-  s2_m3_long$rank %% 10 == 0 ~3,
-  s2_m3_long$rank %% 9 == 0 ~ 3,
-  s2_m3_long$rank %% 8 == 0 ~ 3,
-  s2_m3_long$rank %% 7 == 0 ~ 3,
-  s2_m3_long$rank %% 6 == 0 ~ 2,
-  s2_m3_long$rank %% 5 == 0 ~ 2,
-  s2_m3_long$rank %% 4 == 0 ~ 1,
-  s2_m3_long$rank %% 3 == 0 ~ 1,
-  s2_m3_long$rank %% 2 == 0 ~ 1,
-  s2_m3_long$rank %% 1 == 0 ~ 1)
+#remove the neutral reason group for the binomial
+s3_binom$rank_factor = as.numeric(s3_binom$rank_factor)
+s3_binom <- s3_binom %>%
+  dplyr::filter(rank_factor != 3)
 
-#Pearson's Chi-squared test for independence:
-data_m3_ma <- table(s2_m3_long$Message, s2_m3_long$rank)
-chi_m3_ma <- chisq.test(data_m3_ma)
-expected_m3_ma <- round(chi_m3_ma$expected, 1)
-
-#Chi Square with just weak and strong (no neutral)
-data_m3_ma2 <- s2_m3_long %>%
-  dplyr::filter(s2_m3_long$rank != 2)
-
-table_m3_ma2 <- table(data_m3_ma2$Message, data_m3_ma2$rank)
-chi_m3_ma2 <- chisq.test(table_m3_ma2)
-expected_m3_ma2 <- round(chi_m3_ma2$expected, 1)
-
-####SW survey message testing####
-s3_m3 <- survey_3 %>%
-  dplyr::select("Message_1", "Message_2", "Message_3", "Message_4", "Message_5", "Message_6", "Message_7", "Message_8", "Message_9", "Message_10", "Familiarity_seaweed", "Opinion_seaweed")
-
-#final n = 861 -- 4 responses excluded for incomplete responses.
-s3_m3 <- mutate_all(s3_m3, na_if, '#NULL!') 
-s3_m3 <- s3_m3[complete.cases(s3_m3),]
-
-#rename pre opinion to be group
-colnames(s3_m3)[which(names(s3_m3) == "Opinion_seaweed")] <- "group"
-table(s3_m3$group)
-s3_m3$group <- case_when(
-  s3_m3$group %% 7 == 0 ~ "Never heard",
-  s3_m3$group %% 4 == 0 ~ "Not sure",
-  s3_m3$group %% 3 == 0 ~ "Favorable opinion",
-  s3_m3$group %% 2 == 0 ~ "Neutral",
-  s3_m3$group %% 1 == 0 ~ "Unfavorable opinion")
-
-table(s3_m3$Message_1)
-s3_m3_long <- s3_m3 %>%
-  pivot_longer(cols = Message_1:Message_10, names_to = "Message",
-               values_to = 'rank')
-
-s3_m3_long$rank = as.numeric(s3_m3_long$rank)
-#Transform message "rank" into 1 = weak, 2 = neutral, 3 = strong
-s3_m3_long$rank <- case_when(
-  s3_m3_long$rank %% 10 == 0 ~ 3,
-  s3_m3_long$rank %% 9 == 0 ~ 3,
-  s3_m3_long$rank %% 8 == 0 ~ 3,
-  s3_m3_long$rank %% 7 == 0 ~ 3,
-  s3_m3_long$rank %% 6 == 0 ~ 2,
-  s3_m3_long$rank %% 5 == 0 ~ 2,
-  s3_m3_long$rank %% 4 == 0 ~ 1,
-  s3_m3_long$rank %% 3 == 0 ~ 1,
-  s3_m3_long$rank %% 2 == 0 ~ 1,
-  s3_m3_long$rank %% 1 == 0 ~ 1)
-
-#Pearson's Chi-squared test of independence.
-data_m3_sw <- table(s3_m3_long$Message, s3_m3_long$rank)
-chi_m3_sw <- chisq.test(data_m3_sw)
-expected_m3_sw <- round(chi_m3_sw$expected, 1)
-
-#Chi Square with just weak and strong (no neutral)
-data_m3_sw2 <- s3_m3_long %>%
-  dplyr::filter(s3_m3_long$rank != 2)
-
-table_m3_sw2 <- table(data_m3_sw2$Message, data_m3_sw2$rank)
-chi_m3_sw2 <- chisq.test(table_m3_sw2)
-expected_m3_sw2 <- round(chi_m3_sw2$expected, 1)
 ```
 
-```{r, ChiSq on baseline opinion groups for message testing, include = FALSE}
+```{r, Binomial logistic regression on message testing, include = FALSE}
 
-####MA survey message testing -- how each baseline opinion group ranked each message####
+#Run the binomial glm for survey2 
+head(s2_binom)
+s2_binom$Opinion_aqua_pre <- as.character(s2_binom$Opinion_aqua_pre)
+glm2 <- glm(rank_factor ~ Message * Opinion_aqua_pre, data = s2_binom, family = "binomial")
+summary(glm2)
+#Test the assumptions
 
-#use the data without the neutral category
-s2_m3_long_clean <- s2_m3_long %>%
-  dplyr::filter(rank != 2)
+#Test fitted vs. residuals plot to cover dispersion, outliers, uniformity
 
-ma_message_1 <- s2_m3_long_clean %>%
-  dplyr::filter(Message == "Message_1")
+#simulate the residuals and inspect plots
+output2 <- simulateResiduals(fittedModel = glm2)
 
-ma_message_2 <- s2_m3_long_clean %>%
-  dplyr::filter(Message == "Message_2")
+#Uniformity, dispersion, and outliers
+plotQQunif(output2) #Dispersion: p = 0.97, Outlier: p = 0.75, KS test: p = 0.94, deviations not significant.
+plotResiduals(output2) #no significant problems detected
 
-ma_message_3 <- s2_m3_long_clean %>%
-  dplyr::filter(Message == "Message_3")
+#query the model
+Anova(glm2)
 
-ma_message_4 <- s2_m3_long_clean %>%
-  dplyr::filter(Message == "Message_4")
+#Interpret as odds-ratios with 95% CI
+#odds ratios and 95% CI:
+exp(cbind(OR = coef(glm2), confint(glm2)))
+#pull pairs/contrasts for contrast table
+em2 <- emmeans(glm2, ~Opinion_aqua_pre|Message, type = "response")
+pairs2 <-pairs(em2, adjust = "fdr")
+plot(pairs2)
+#Wald test for an overall effect 
+wald.test(b = coef(glm2), Sigma = vcov(glm2), Terms = 1:3)
+#X2 = 12.4, df = 2, P(> X2) = 0.006 overall model holds.
 
-ma_message_5 <- s2_m3_long_clean %>%
-  dplyr::filter(Message == "Message_5")
+#Run the binomial glm for survey3
+s3_binom$Opinion_seaweed <- as.character(s3_binom$Opinion_seaweed)
+glm3 <- glm(rank_factor ~ Message*Opinion_seaweed, data = s3_binom,
+            family = "binomial")
+summary(glm3)
+#Test the assumptions
+output3 <- simulateResiduals(fittedModel = glm3)
+#Uniformity, dispersion, and outliers
+plotQQunif(output3) #Dispersion: p = 0.83, Outlier: p = 0.59, KS test: p = 0.96, deviations not significant.
+plotResiduals(output3) #ok with large sample size
+#query the model
+Anova(glm3)
 
-ma_message_6 <- s2_m3_long_clean %>%
-  dplyr::filter(Message == "Message_6")
+#Interpret as odds-ratios with 95% CI
+#odds ratios and 95% CI:
+exp(cbind(OR = coef(glm3), confint(glm3)))
+#pull pairs/contrasts for contrast table
+em3 <- emmeans(glm3, ~Opinion_seaweed|Message, type = "response")
+pairs3 <-pairs(em3, adjust = "tukey")
+plot(pairs3) +
+  facet_wrap(~Message)
+#Wald test for an overall effect 
+wald.test(b = coef(glm3), Sigma = vcov(glm3), Terms = 2:3)
+#X2 = 103.1, df = 2, P(> X2) = 0.0 #overall model holds.
 
-ma_message_7 <- s2_m3_long_clean %>%
-  dplyr::filter(Message == "Message_7")
+table(s3_binom$Opinion_seaweed, s3_binom$Message, s3_binom$rank_factor)
 
-ma_message_8 <- s2_m3_long_clean %>%
-  dplyr::filter(Message == "Message_8")
-
-ma_message_9 <- s2_m3_long_clean %>%
-  dplyr::filter(Message == "Message_9")
-
-ma_message_10 <- s2_m3_long_clean %>%
-  dplyr::filter(Message == "Message_10")
-
-#Pearson's Chi-squared test for independence:
-ma_m1_opinion <- table(ma_message_1$Opinion_aqua_pre, ma_message_1$rank)
-ma_m1_chi <- chisq.test(ma_m1_opinion)
-ma_m1_expected <- round(ma_m1_chi$expected, 1)
-#Message 1 is not significant
-
-ma_m2_opinion <- table(ma_message_2$Opinion_aqua_pre, ma_message_2$rank)
-ma_m2_chi <- chisq.test(ma_m2_opinion)
-ma_m2_expected <- round(ma_m2_chi$expected, 1)
-#approximation may be incorrect (check on this) Message 2 may be significant
-
-ma_m3_opinion <- table(ma_message_3$Opinion_aqua_pre, ma_message_3$rank)
-ma_m3_chi <- chisq.test(ma_m3_opinion)
-ma_m3_expected <- round(ma_m3_chi$expected, 1)
-#Message 3 is not significant
-
-ma_m4_opinion <- table(ma_message_4$Opinion_aqua_pre, ma_message_4$rank)
-ma_m4_chi <- chisq.test(ma_m4_opinion)
-ma_m4_expected <- round(ma_m4_chi$expected, 1)
-#Message 4 is not significant
-
-ma_m5_opinion <- table(ma_message_5$Opinion_aqua_pre, ma_message_5$rank)
-ma_m5_chi <- chisq.test(ma_m5_opinion)
-ma_m5_expected <- round(ma_m5_chi$expected, 1)
-#Message 5 is not significant
-
-ma_m6_opinion <- table(ma_message_6$Opinion_aqua_pre, ma_message_6$rank)
-ma_m6_chi <- chisq.test(ma_m6_opinion)
-ma_m6_expected <- round(ma_m6_chi$expected, 1)
-#Message 6 is significant (0.0091)
-
-ma_m7_opinion <- table(ma_message_7$Opinion_aqua_pre, ma_message_7$rank)
-ma_m7_chi <- chisq.test(ma_m7_opinion)
-ma_m7_expected <- round(ma_m7_chi$expected, 1)
-#Message 7 is not significant
-
-ma_m8_opinion <- table(ma_message_8$Opinion_aqua_pre, ma_message_8$rank)
-ma_m8_chi <- chisq.test(ma_m8_opinion)
-ma_m8_expected <- round(ma_m8_chi$expected, 1)
-#Message 8 is not significant
-
-ma_m9_opinion <- table(ma_message_9$Opinion_aqua_pre, ma_message_9$rank)
-ma_m9_chi <- chisq.test(ma_m9_opinion)
-ma_m9_expected <- round(ma_m9_chi$expected, 1)
-#Message 9 is not significant
-
-ma_m10_opinion <- table(ma_message_10$Opinion_aqua_pre, ma_message_10$rank)
-ma_m10_chi <- chisq.test(ma_m10_opinion)
-ma_m10_expected <- round(ma_m10_chi$expected, 1)
-#Message 10 is not significant
-
-####SW survey message testing -- how each baseline opinion group ranked each message####
-
-#use the data without the neutral category
-s3_m3_long_clean <- s3_m3_long %>%
-  dplyr::filter(rank != 2)
-
-sw_message_1 <- s3_m3_long_clean %>%
-  dplyr::filter(Message == "Message_1")
-
-sw_message_2 <- s3_m3_long_clean %>%
-  dplyr::filter(Message == "Message_2")
-
-sw_message_3 <- s3_m3_long_clean %>%
-  dplyr::filter(Message == "Message_3")
-
-sw_message_4 <- s3_m3_long_clean %>%
-  dplyr::filter(Message == "Message_4")
-
-sw_message_5 <- s3_m3_long_clean %>%
-  dplyr::filter(Message == "Message_5")
-
-sw_message_6 <- s3_m3_long_clean %>%
-  dplyr::filter(Message == "Message_6")
-
-sw_message_7 <- s3_m3_long_clean %>%
-  dplyr::filter(Message == "Message_7")
-
-sw_message_8 <- s3_m3_long_clean %>%
-  dplyr::filter(Message == "Message_8")
-
-sw_message_9 <- s3_m3_long_clean %>%
-  dplyr::filter(Message == "Message_9")
-
-sw_message_10 <- s3_m3_long_clean %>%
-  dplyr::filter(Message == "Message_10")
-
-#Pearson's Chi-squared test for independence:
-sw_m1_opinion <- table(sw_message_1$group, sw_message_1$rank)
-sw_m1_chi <- chisq.test(sw_m1_opinion)
-sw_m1_expected <- round(sw_m1_chi$expected, 1)
-#Message 1 is not significant
-
-sw_m2_opinion <- table(sw_message_2$group, sw_message_2$rank)
-sw_m2_chi <- chisq.test(sw_m2_opinion)
-sw_m2_expected <- round(sw_m2_chi$expected, 1)
-#Message 2 is significant (0.011)
-
-sw_m3_opinion <- table(sw_message_3$group, sw_message_3$rank)
-sw_m3_chi <- chisq.test(sw_m3_opinion)
-sw_m3_expected <- round(sw_m3_chi$expected, 1)
-#Message 3 is not significant
-
-sw_m4_opinion <- table(sw_message_4$group, sw_message_4$rank)
-sw_m4_chi <- chisq.test(sw_m4_opinion)
-sw_m4_expected <- round(sw_m4_chi$expected, 1)
-#Message 4 is not significant
-
-sw_m5_opinion <- table(sw_message_5$group, sw_message_5$rank)
-sw_m5_chi <- chisq.test(sw_m5_opinion)
-sw_m5_expected <- round(sw_m5_chi$expected, 1)
-#Message 5 is not significant
-
-sw_m6_opinion <- table(sw_message_6$group, sw_message_6$rank)
-sw_m6_chi <- chisq.test(sw_m6_opinion)
-sw_m6_expected <- round(sw_m6_chi$expected, 1)
-#Message 6 is not significant
-
-sw_m7_opinion <- table(sw_message_7$group, sw_message_7$rank)
-sw_m7_chi <- chisq.test(sw_m7_opinion)
-sw_m7_expected <- round(sw_m7_chi$expected, 1)
-#Message 7 is not significant
-
-sw_m8_opinion <- table(sw_message_8$group, sw_message_8$rank)
-sw_m8_chi <- chisq.test(sw_m8_opinion)
-sw_m8_expected <- round(sw_m8_chi$expected, 1)
-#Message 8 is not significant
-
-sw_m9_opinion <- table(sw_message_9$group, sw_message_9$rank)
-sw_m9_chi <- chisq.test(sw_m9_opinion)
-sw_m9_expected <- round(sw_m9_chi$expected, 1)
-#Message 9 is significant (0.013)
-
-sw_m10_opinion <- table(sw_message_10$group, sw_message_10$rank)
-sw_m10_chi <- chisq.test(sw_m10_opinion)
-sw_m10_expected <- round(sw_m10_chi$expected, 1)
-#Message 10 is not significant
 ```
 
 ##Data transformations for figures (MA and SW surveys)
-```{r, Data transformations for Figure 1a-b, echo=FALSE}
+```{r, Data for Figure 1a-b, echo=FALSE}
 
 #select necessary columns from SW survey data and remove incomplete responses 
 sw_plot_data <- survey_3 %>%
@@ -763,7 +565,7 @@ sw_graph_data <- rbind(sw_graph_data, unknown)
 
 ```
 
-```{r, Data transformations for Figure 2a-b, echo = FALSE}
+```{r, Data for Figure 2a-b, echo = FALSE}
 #Data for coastal states only#
 s2_data <- survey_2 %>%
   dplyr::select(c("Message_1", "Message_2", "Message_3", "Message_4", "Message_5", "Message_6", "Message_7", "Message_8", "Message_9", "Message_10", "Opinion_aqua_pre", "Region_s3"))
@@ -885,6 +687,9 @@ s3_data$rank_factor <- case_when(
 #Supplemental table S4 in paper
 table(s3_data$rank_factor, s3_data$Message)
 
+#counts for message rank by baseline familiarity
+counts <- table(s3_data$rank, s3_data$Message, s3_data$Opinion_seaweed)
+
 #Frequencies for heat map
 
 #Frequency table for each grouping
@@ -956,9 +761,16 @@ sw_plot <- ggplot(data = sw_graph_data,
   scale_fill_viridis_d(direction = -1) +
   xlab("Baseline familiarity") +
   ylab("Percent") +
-  ggtitle("Opinions of seaweed farming pre- and post- intervention") +
   theme_bw() +
+  scale_y_continuous(expand = c(0.01,0))+
   theme(legend.position = "bottom") +
+  theme(axis.text.x = element_blank(),
+        axis.title.x = element_blank(),
+        axis.text.y = element_blank(),
+        axis.title.y = element_blank(),
+        plot.title = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.grid.major = element_blank()) +
   theme(aspect.ratio = 1/1.8)
 
 sw_plot <- sw_plot + coord_flip()
@@ -1032,18 +844,21 @@ trust_data$color <- fct_relevel(trust_data$color, c(">50% Trust", "<50% Trust"))
 
 trust_plot <- ggplot(data = trust_data,
                 mapping = aes(x = freq_3, y = source)) +
-  geom_col(width = 0.75, position = "dodge2", colour = "black", size = 0.2) +
-  xlim(0, 1.0)+
-  xlab("Frequency of trust response (4-5)") +
-  ylab("Source of information") +
-  theme_bw() +
-  theme(plot.title = element_blank()) +
-    theme(legend.title = element_blank())  +
-  theme(aspect.ratio = 1/1.8)
+  geom_col(width = 0.75, position = "dodge2", colour = "black", size = 0.2, fill = "azure4") +
+  theme_classic() +
+  scale_x_continuous(limits = c(0, 1), expand = c(0.01,0))+
+  theme(axis.text.x = element_blank(),
+        axis.title.x = element_blank(),
+        axis.text.y = element_blank(),
+        axis.title.y = element_blank(),
+        plot.title = element_blank(),
+        legend.title = element_blank()) +
+    theme(aspect.ratio = 1/1.8)
 
 trust_plot
 ggsave("trust_plot.png", dpi = 600)
 ```
+
 ##Sociodemographics (MA and SW surveys)
 ```{r, Sociodemographic ChiSquare on opinion for all surveys, include = FALSE}
 
@@ -1284,16 +1099,8 @@ age_chi_familiarity_aq <- chisq.test(age_familiarity_aq_table)
 
 ```
 
-##Other analyses -- Regressions and ANOVAs
+##Other analyses (not in paper) -- Wilcoxon Tests on pre-post opinion
 
-
-Identifying Strong Messages in Support of Aquaculture
-
-We used multilevel ordered logistic regressions and binomial logistic regressions to test variations in strength (rank 1-10) of each message (MA and SW tested separately). Two responses from the SW survey that did not answer necessary questions were removed. For the MA survey, we tested group characteristics as categorical predictors of rank order based on initial opinion of each sector (unfavorable, neutral/not sure, and favorable). Because we had the detailed levels of familiarity for the SW survey, we added “never heard of seaweed farming” as a factor level to our categorical predictor.
-
-Our binomial logistic regression models met the assumptions of dispersion, outliers, and uniformity and fitted vs. residual plots were adequate.
-
-Wilcoxon Tests
 To assess how reported opinions of aquaculture changed after viewing videos, we performed Wilcoxon signed rank tests (R package rstatix) on our paired data. This nonparametric test was selected because our data is both ordinal and non-normal and all assumptions were met, given that the test provides a continuity correction. We compared the average response for each of the 6 videos watched in the MA survey, and for the SW survey video. We justify the use of mean (rather than median) given that we used our full six-point likert scale, as well as the fact that we have an appropriate sample size. We also calculated Wilcoxon effect sizes using the formula r = Z/√N where Z is the standardized test statistic and N is the number of response pairs.
 
 ```{r, Data for Wilcoxon tests on pre-post opinion, include = FALSE}
@@ -1458,444 +1265,4 @@ wilcox_effsize(Opinion ~ video, paired = TRUE)
 sum_sw <- s3_wilcox_data %>%
   group_by(video) %>%
   summarise(avg = sum(Opinion/length(Opinion)))
-```
-
-```{r, Data for OLS message testing analyses, include = FALSE}
-s2_m3 <- survey_2 %>%
-  dplyr::select(c("Message_1", "Message_2", "Message_3", "Message_4", "Message_5", "Message_6", "Message_7", "Message_8", "Message_9", "Message_10", "Opinion_aqua_pre"))
-
-#Remove NAs - final n = 787
-s2_m3 <- mutate_all(s2_m3, na_if, '#NULL!') 
-s2_m3 <- s2_m3[complete.cases(s2_m3),]
-table(s2_m3$Opinion_aqua_pre)
-#group opinion into unfavorable, neutral, favorable
-s2_m3$Opinion_aqua_pre <- case_when(
-  s2_m3$Opinion_aqua_pre %% 4 == 0 ~ "Not sure",
-  s2_m3$Opinion_aqua_pre %% 3 == 0 ~ "Favorable opinion of marine aquaculture",
-  s2_m3$Opinion_aqua_pre %% 2 == 0 ~ "Neutral",
-  s2_m3$Opinion_aqua_pre %% 1 == 0 ~ "Unfavorable opinion of marine aquaculture")
-
-#long-form
-s2_m3_long <- s2_m3 %>%
-  pivot_longer(cols = Message_1:Message_10, names_to = "Message",
-               values_to = 'rank')
-
-s2_m3_long$rank = as.numeric(s2_m3_long$rank)
-
-#make Message rank order into 5 ordinal categories:
-s2_m3_long$rank <- case_when(
-  s2_m3_long$rank %% 10 == 0 ~ 5,
-  s2_m3_long$rank %% 9 == 0 ~ 5,
-  s2_m3_long$rank %% 8 == 0 ~ 4,
-  s2_m3_long$rank %% 7 == 0 ~ 4,
-  s2_m3_long$rank %% 6 == 0 ~ 3,
-  s2_m3_long$rank %% 5 == 0 ~ 3,
-  s2_m3_long$rank %% 4 == 0 ~ 2,
-  s2_m3_long$rank %% 3 == 0 ~ 2,
-  s2_m3_long$rank %% 2 == 0 ~ 1,
-  s2_m3_long$rank %% 1 == 0 ~ 1)
-
-table(s2_m3_long$Message, s2_m3_long$rank)
-#message, region, race are factors
-s2_m3_long$Message = as.factor(s2_m3_long$Message)
-
-#re-tell it that rank is an ordinal factor
-s2_m3_long$rank = factor(s2_m3_long$rank,
-                             ordered = TRUE,
-                             levels = c("1", "2", "3", "4", "5"))
-
-Message_1 <- s2_m3_long %>%
-  dplyr::filter(Message == "Message_1")
-Message_2 <- s2_m3_long %>%
-  dplyr::filter(Message == "Message_2")
-Message_3 <- s2_m3_long %>%
-  dplyr::filter(Message == "Message_3")
-Message_4 <- s2_m3_long %>%
-  dplyr::filter(Message == "Message_4")
-Message_5 <- s2_m3_long %>%
-  dplyr::filter(Message == "Message_5")
-Message_6 <- s2_m3_long %>%
-  dplyr::filter(Message == "Message_6")
-Message_7 <- s2_m3_long %>%
-  dplyr::filter(Message == "Message_7")
-Message_8 <- s2_m3_long %>%
-  dplyr::filter(Message == "Message_8")
-Message_9 <- s2_m3_long %>%
-  dplyr::filter(Message == "Message_9")
-Message_10 <- s2_m3_long %>%
-  dplyr::filter(Message == "Message_10")
-
-####Survey 3 without resistant group####
-#NOTE: code for this analysis with the resistant group is in the AoP Analyses.Rmd file still
-s3_m3 <- survey_3 %>%
-  dplyr::select("Message_1", "Message_2", "Message_3", "Message_4", "Message_5", "Message_6", "Message_7", "Message_8", "Message_9", "Message_10", "Familiarity_seaweed", "Opinion_seaweed")
-
-table(s3_m3$Opinion_seaweed)
-
-#rename pre opinion to be group
-colnames(s3_m3)[which(names(s3_m3) == "Opinion_seaweed")] <- "group"
-table(s3_m3$group)
-s3_m3$group <- case_when(
-  s3_m3$group %% 7 == 0 ~ "Never heard",
-  s3_m3$group %% 4 == 0 ~ "Not sure",
-  s3_m3$group %% 3 == 0 ~ "Favorable opinion",
-  s3_m3$group %% 2 == 0 ~ "Neutral",
-  s3_m3$group %% 1 == 0 ~ "Unfavorable opinion")
-
-table(s3_m3$Message_1)
-s3_m3_long <- s3_m3 %>%
-  pivot_longer(cols = Message_1:Message_10, names_to = "Message",
-               values_to = 'rank')
-
-s3_m3_long$rank = as.numeric(s3_m3_long$rank)
-#make Message rank order 1-5 (1 very weak 5 very strong)
-s3_m3_long$rank <- case_when(
-  s3_m3_long$rank %% 10 == 0 ~ 5,
-  s3_m3_long$rank %% 9 == 0 ~ 5,
-  s3_m3_long$rank %% 8 == 0 ~ 4,
-  s3_m3_long$rank %% 7 == 0 ~ 4,
-  s3_m3_long$rank %% 6 == 0 ~ 3,
-  s3_m3_long$rank %% 5 == 0 ~ 3,
-  s3_m3_long$rank %% 4 == 0 ~ 2,
-  s3_m3_long$rank %% 3 == 0 ~ 2,
-  s3_m3_long$rank %% 2 == 0 ~ 1,
-  s3_m3_long$rank %% 1 == 0 ~ 1)
-
-table(s3_m3_long$Message, s3_m3_long$rank)
-
-
-#message, region, race are factors
-s3_m3_long$Message = as.factor(s3_m3_long$Message)
-
-#Rank is an ordered factor
-s3_m3_long$rank = factor(s3_m3_long$rank,
-                             ordered = TRUE,
-                             levels = c("1", "2", "3", "4", "5"))
-
-Message_1_sw <- s3_m3_long %>%
-  dplyr::filter(Message == "Message_1")
-Message_2_sw <- s3_m3_long %>%
-  dplyr::filter(Message == "Message_2")
-Message_3_sw <- s3_m3_long %>%
-  dplyr::filter(Message == "Message_3")
-Message_4_sw <- s3_m3_long %>%
-  dplyr::filter(Message == "Message_4")
-Message_5_sw <- s3_m3_long %>%
-  dplyr::filter(Message == "Message_5")
-Message_6_sw <- s3_m3_long %>%
-  dplyr::filter(Message == "Message_6")
-Message_7_sw <- s3_m3_long %>%
-  dplyr::filter(Message == "Message_7")
-Message_8_sw <- s3_m3_long %>%
-  dplyr::filter(Message == "Message_8")
-Message_9_sw <- s3_m3_long %>%
-  dplyr::filter(Message == "Message_9")
-Message_10_sw <- s3_m3_long %>%
-  dplyr::filter(Message == "Message_10")
-
-```
-
-```{r, Ordered logistic regressions on rank order of messages, include = FALSE}
-#Run models for survey 2 (marine aquaculture)
-ols1_aq<-MASS::polr(rank~Opinion_aqua_pre, data = Message_1, Hess = TRUE)
-brant <- as.data.frame(brant(ols1_aq)) #meets parallel regression assumption
-
-ols2_aq<-MASS::polr(rank~Opinion_aqua_pre, data = Message_2, Hess = TRUE)
-brant(ols2_aq) #meets parallel regression assumption
-
-ols3_aq<-MASS::polr(rank~Opinion_aqua_pre, data = Message_3, Hess = TRUE)
-brant(ols3_aq) #meets parallel regression assumption
-
-ols4_aq<-MASS::polr(rank~Opinion_aqua_pre, data = Message_4, Hess = TRUE)
-brant <- as.data.frame(brant(ols4_aq))#meets parallel regression assumption
-
-ols5_aq<-MASS::polr(rank~Opinion_aqua_pre, data = Message_5, Hess = TRUE)
-brant <- as.data.frame(brant(ols5_aq))#meets parallel regression assumption
-
-ols6_aq<-MASS::polr(rank~Opinion_aqua_pre, data = Message_6, Hess = TRUE)
-brant <- as.data.frame(brant(ols6_aq))#meets parallel regression assumption
-
-ols7_aq<-MASS::polr(rank~Opinion_aqua_pre, data = Message_7, Hess = TRUE)
-brant <- as.data.frame(brant(ols7_aq))#meets parallel regression assumption
-
-ols8_aq<-MASS::polr(rank~Opinion_aqua_pre, data = Message_8, Hess = TRUE)
-brant <- as.data.frame(brant(ols8_aq))#meets parallel regression assumption
-
-ols9_aq<-MASS::polr(rank~Opinion_aqua_pre, data = Message_9, Hess = TRUE)
-brant <- as.data.frame(brant(ols9_aq))#meets parallel regression assumption
-
-ols10_aq<-MASS::polr(rank~Opinion_aqua_pre, data = Message_10, Hess = TRUE)
-brant <- as.data.frame(brant(ols10_aq))#meets parallel regression assumption
-
-#query the models
-Anova(ols1_aq)
-Anova(ols2_aq)
-Anova(ols3_aq)
-Anova(ols4_aq)
-Anova(ols5_aq)
-Anova(ols6_aq)
-Anova(ols7_aq)
-Anova(ols8_aq)
-Anova(ols9_aq)
-Anova(ols10_aq)
-
-#get coefficients
-coefs_aq_1 <- coef(ols1_aq)
-coefs_aq_2 <- coef(ols2_aq)
-coefs_aq_3 <- coef(ols3_aq)
-coefs_aq_4 <- coef(ols4_aq)
-coefs_aq_5 <- coef(ols5_aq)
-coefs_aq_6 <- coef(ols6_aq)
-coefs_aq_7 <- coef(ols7_aq)
-coefs_aq_8 <- coef(ols7_aq)
-coefs_aq_9 <- coef(ols9_aq)
-coefs_aq_10 <- coef(ols10_aq)
-#Odds ratios - exponentiate the estimates and confidence intervals of the coefficients.
-ci_aq_1 <- confint(ols1_aq)
-exp(cbind(OR = coef(ols1_aq), ci_aq_1))
-ci_aq_2 <- confint(ols2_aq)
-exp(cbind(OR = coef(ols2_aq), ci_aq_2))
-ci_aq_3 <- confint(ols3_aq)
-exp(cbind(OR = coef(ols3_aq), ci_aq_3))
-ci_aq_4 <- confint(ols4_aq)
-exp(cbind(OR = coef(ols4_aq), ci_aq_4))
-ci_aq_5 <- confint(ols5_aq)
-exp(cbind(OR = coef(ols5_aq), ci_aq_5))
-ci_aq_6 <- confint(ols6_aq)
-exp(cbind(OR = coef(ols6_aq), ci_aq_6))
-ci_aq_7 <- confint(ols7_aq)
-exp(cbind(OR = coef(ols7_aq), ci_aq_7))
-ci_aq_8 <- confint(ols8_aq)
-exp(cbind(OR = coef(ols8_aq), ci_aq_8))
-ci_aq_9 <- confint(ols9_aq)
-exp(cbind(OR = coef(ols9_aq), ci_aq_9))
-ci_aq_10 <- confint(ols10_aq)
-exp(cbind(OR = coef(ols10_aq), ci_aq_10))
-
-
-#run models for survey 3 (seaweed farming)
-ols1_sw<-MASS::polr(rank~group, data = Message_1_sw, Hess = TRUE)
-Anova(ols1_sw)
-brant(ols1_sw) #meets parallel regression assumption
-
-ols2_sw<-MASS::polr(rank~group, data = Message_2_sw, Hess = TRUE)
-Anova(ols2_sw)
-brant(ols2_sw) #meets parallel regression assumption
-
-ols3_sw<-MASS::polr(rank~group, data = Message_3_sw, Hess = TRUE)
-Anova(ols3_sw)
-brant(ols3_sw) #meets parallel regression assumption
-
-ols4_sw<-MASS::polr(rank~group, data = Message_4_sw, Hess = TRUE)
-Anova(ols4_sw)
-brant(ols4_sw)#meets parallel regression assumption
-
-ols5_sw<-MASS::polr(rank~group, data = Message_5_sw, Hess = TRUE)
-Anova(ols5_sw)
-brant(ols5_sw)#meets parallel regression assumption
-
-ols6_sw<-MASS::polr(rank~group, data = Message_6_sw, Hess = TRUE)
-Anova(ols6_sw)
-brant(ols6_sw)#meets parallel regression assumption
-
-ols7_sw<-MASS::polr(rank~group, data = Message_7_sw, Hess = TRUE)
-Anova(ols7_sw)
-brant(ols7_sw)#meets parallel regression assumption
-
-ols8_sw<-MASS::polr(rank~group, data = Message_8_sw, Hess = TRUE)
-Anova(ols8_sw)
-brant(ols8_sw)#meets parallel regression assumption
-
-ols9_sw<-MASS::polr(rank~group, data = Message_9_sw, Hess = TRUE)
-Anova(ols9_sw)
-brant(ols9_sw)#meets parallel regression assumption
-
-ols10_sw<-MASS::polr(rank~group, data = Message_10_sw, Hess = TRUE)
-Anova(ols10_sw)
-brant(ols10_sw)#meets parallel regression assumption
-
-#get coefficients
-coefs_sw_1 <- coef(ols1_sw)
-coefs_sw_2 <- coef(ols2_sw)
-coefs_sw_3 <- coef(ols3_sw)
-coefs_sw_4 <- coef(ols4_sw)
-coefs_sw_5 <- coef(ols5_sw)
-coefs_sw_6 <- coef(ols6_sw)
-coefs_sw_7 <- coef(ols7_sw)
-coefs_sw_8 <- coef(ols8_sw)
-coefs_sw_9 <- coef(ols9_sw)
-coefs_sw_10 <- coef(ols10_sw)
-#Odds ratios - exponentiate the estimates and confidence intervals of the coefficients.
-ci_sw_1 <- confint(ols1_sw)
-exp(cbind(OR = coef(ols1_sw), ci_sw_1))
-ci_sw_2 <- confint(ols2_sw)
-exp(cbind(OR = coef(ols2_sw), ci_sw_2))
-ci_sw_3 <- confint(ols3_sw)
-exp(cbind(OR = coef(ols3_sw), ci_sw_3))
-ci_sw_4 <- confint(ols4_sw)
-exp(cbind(OR = coef(ols4_sw), ci_sw_4))
-ci_sw_5 <- confint(ols5_sw)
-exp(cbind(OR = coef(ols5_sw), ci_sw_5))
-ci_sw_6 <- confint(ols6_sw)
-exp(cbind(OR = coef(ols6_sw), ci_sw_6))
-ci_sw_7 <- confint(ols7_sw)
-exp(cbind(OR = coef(ols7_sw), ci_sw_7))
-ci_sw_8 <- confint(ols8_sw)
-exp(cbind(OR = coef(ols8_sw), ci_sw_8))
-ci_sw_9 <- confint(ols9_sw)
-exp(cbind(OR = coef(ols9_sw), ci_sw_9))
-ci_sw_10 <- confint(ols10_sw)
-exp(cbind(OR = coef(ols10_sw), ci_sw_10))
-
-survey_3_long <- survey_3 %>%
-  pivot_longer(cols = Message_1:Message_10, names_to = "Message",
-               values_to = 'rank')
-survey_3_long$rank <- case_when(
-  survey_3_long$rank %% 10 == 0 ~ 5,
-  survey_3_long$rank %% 9 == 0 ~ 5,
-  survey_3_long$rank %% 8 == 0 ~ 4,
-  survey_3_long$rank %% 7 == 0 ~ 4,
-  survey_3_long$rank %% 6 == 0 ~ 3,
-  survey_3_long$rank %% 5 == 0 ~ 3,
-  survey_3_long$rank %% 4 == 0 ~ 2,
-  survey_3_long$rank %% 3 == 0 ~ 2,
-  survey_3_long$rank %% 2 == 0 ~ 1,
-  survey_3_long$rank %% 1 == 0 ~ 1)
-
-```
-
-```{r, Data for binomial logistic regression on message testing, include = FALSE}
-###note to self that what i'm doing here repeats the code in the message heat map chunk and eventually can be consolodated.
-
-#Data for coastal states only#
-s2_binom <- survey_2 %>%
-  dplyr::select(c("Message_1", "Message_2", "Message_3", "Message_4", "Message_5", "Message_6", "Message_7", "Message_8", "Message_9", "Message_10", "Opinion_aqua_pre"))
-
-#Remove NAs - final n = 153
-s2_binom <- mutate_all(s2_binom, na_if, '#NULL!') 
-s2_binom <- s2_binom[complete.cases(s2_binom),]
-table(s2_binom$Opinion_aqua_pre)
-
-#Mutate to long-form data
-s2_binom <- s2_binom %>%
-  pivot_longer(cols = Message_1:Message_10, names_to = "Message",
-               values_to = 'rank')
-
-#Set up rankings to be in three categories: 0 = weak, 1 = strong, 3 = neutral:
-s2_binom$rank_factor <- case_when(
-     s2_binom$rank %% 10 == 0 ~ 1,
-     s2_binom$rank %% 9 == 0 ~ 1,
-     s2_binom$rank %% 8 == 0 ~ 1,
-     s2_binom$rank %% 7 == 0 ~ 1,
-     s2_binom$rank %% 6 == 0 ~ 3,
-     s2_binom$rank %% 5 == 0 ~ 3,
-     s2_binom$rank %% 4 == 0 ~ 0,
-     s2_binom$rank %% 3 == 0 ~ 0,
-     s2_binom$rank %% 2 == 0 ~ 0,
-     s2_binom$rank %% 1 == 0 ~ 0)
-
-#Supplemental table S4 in paper
-table(s2_binom$rank_factor, s2_binom$Message)
-
-#Survey 3 data for heat map plot without resistant group
-s3_binom <- survey_3 %>%
-  dplyr::select(c("Message_1", "Message_2", "Message_3", "Message_4", "Message_5", "Message_6", "Message_7", "Message_8", "Message_9", "Message_10", "Opinion_seaweed"))
-table(s3_binom$Opinion_seaweed)
-
-#Remove NAs - final total n = 865
-s3_binom <- mutate_all(s3_binom, na_if, '#NULL!')
-s3_binom <- s3_binom[complete.cases(s3_binom),]
-
-#group opinion into unfavorable, neutral, favorable, never heard
-s3_binom$Opinion_seaweed <- case_when(
-  s3_binom$Opinion_seaweed %% 7 == 0 ~ "Never heard",
-  s3_binom$Opinion_seaweed %% 4 == 0 ~ "Not sure",
-  s3_binom$Opinion_seaweed %% 3 == 0 ~ "Favorable",
-  s3_binom$Opinion_seaweed %% 2 == 0 ~ "Neutral",
-  s3_binom$Opinion_seaweed %% 1 == 0 ~ "Unfavorable"
-)
-
-table(s3_binom$Opinion_seaweed)
-
-#Mutate to long-form data
-s3_binom <- s3_binom %>%
-  pivot_longer(cols = Message_1:Message_10, names_to = "Message",
-               values_to = 'rank')
-
-#Set up rankings to be in three categories: 0 = weak, 1 = strong, 3 = neutral:
-s3_binom$rank_factor <- case_when(
-     s3_binom$rank %% 10 == 0 ~ 1,
-     s3_binom$rank %% 9 == 0 ~ 1,
-     s3_binom$rank %% 8 == 0 ~ 1,
-     s3_binom$rank %% 7 == 0 ~ 1,
-     s3_binom$rank %% 6 == 0 ~ 3,
-     s3_binom$rank %% 5 == 0 ~ 3,
-     s3_binom$rank %% 4 == 0 ~ 0,
-     s3_binom$rank %% 3 == 0 ~ 0,
-     s3_binom$rank %% 2 == 0 ~ 0,
-     s3_binom$rank %% 1 == 0 ~ 0)
-
-#remove the neutral reason group for the binomial
-s2_binom$rank_factor = as.numeric(s2_binom$rank_factor)
-s2_binom <- s2_binom %>%
-  dplyr::filter(rank_factor != 3)
-
-s3_binom$rank_factor = as.numeric(s3_binom$rank_factor)
-s3_binom <- s3_binom %>%
-  dplyr::filter(rank_factor != 3)
-
-```
-
-```{r, Binomial logistic regression on message testing, include = FALSE}
-
-#Run the binomial glm for survey2 
-glm2 <- glm(rank_factor ~ Message * Opinion_aqua_pre, data = s2_binom,
-            family = "binomial")
-summary(glm2)
-#Test the assumptions
-
-#Test fitted vs. residuals plot to cover dispersion, outliers, uniformity
-
-#simulate the residuals and inspect plots
-output2 <- simulateResiduals(fittedModel = glm2)
-
-#Uniformity, dispersion, and outliers
-plotQQunif(output2) #Dispersion: p = 0.94, Outlier: p = 0.75, KS test: p = 0.94, deviations not significant.
-plotResiduals(output2)
-
-#query the model
-Anova(glm2)
-
-#Interpret as odds-ratios with 95% CI
-#odds ratios and 95% CI:
-exp(cbind(OR = coef(glm2), confint(glm2)))
-#pull pairs/contrasts for contrast table
-em2 <- emmeans(glm2, ~Message, type = "response")
-pairs2 <-pairs(em2, adjust = "tukey")
-#Wald test for an overall effect 
-wald.test(b = coef(glm2), Sigma = vcov(glm2), Terms = 2:3)
-#X2 = 6.6, df = 2, P(> X2) = 0.037 #overall model holds.
-
-#Run the binomial glm for survey3
-glm3 <- glm(rank_factor ~ Message*Opinion_seaweed, data = s3_binom,
-            family = "binomial")
-summary(glm3)
-#Test the assumptions
-output3 <- simulateResiduals(fittedModel = glm3)
-#Uniformity, dispersion, and outliers
-plotQQunif(output3) #Dispersion: p = 0.87, Outlier: p = 0.59, KS test: p = 0.87, deviations not significant.
-plotResiduals(output3)
-#query the model
-Anova(glm3)
-
-#Interpret as odds-ratios with 95% CI
-#odds ratios and 95% CI:
-exp(cbind(OR = coef(glm3), confint(glm3)))
-#pull pairs/contrasts for contrast table
-em3 <- emmeans(glm3, ~Message, type = "response")
-pairs3 <-pairs(em3, adjust = "tukey")
-#Wald test for an overall effect 
-wald.test(b = coef(glm3), Sigma = vcov(glm3), Terms = 2:3)
-#X2 = 334.0, df = 2, P(> X2) = 0.0 #overall model holds.
-
 ```
