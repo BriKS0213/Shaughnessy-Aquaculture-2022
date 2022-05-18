@@ -1,4 +1,4 @@
-# Shaughnessy-PNAS-2022
+# Shaughnessy-Aquaculture-2022
 [![DOI](https://zenodo.org/badge/446994414.svg)](https://zenodo.org/badge/latestdoi/446994414)
 
 ##Data files and code for PNAS article.
